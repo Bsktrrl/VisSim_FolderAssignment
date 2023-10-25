@@ -1,11 +1,5 @@
-using System.Collections;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Dynamic;
 using UnityEngine;
-using static TriangleSurface;
-using UnityEngine.UIElements;
-using Unity.VisualScripting;
 using System.Linq;
 using System.Globalization;
 using System;
@@ -33,6 +27,10 @@ public class TriangleSurface : MonoBehaviour
         }
     }
 
+
+    //--------------------
+
+
     [SerializeField] TextAsset vertexFile;
     [SerializeField] TextAsset indicesFile;
 
@@ -40,12 +38,15 @@ public class TriangleSurface : MonoBehaviour
     public List<Vertex> vertices = new();
     public List<int> indices = new();
 
+
+    //--------------------
+
+
     private void Awake()
     {
         ReadVertexData();
         ReadIndicesData();
     }
-
     void Start()
     {
         BuildMesh();
@@ -57,6 +58,10 @@ public class TriangleSurface : MonoBehaviour
         print($"Pos: {hit.position}");
         print($"Norm: {hit.normal}");
     }
+
+
+    //--------------------
+
 
     void ReadVertexData()
     {
@@ -253,21 +258,21 @@ public class TriangleSurface : MonoBehaviour
     void OnDrawGizmos()
     {
         // For each triangle
-        for (var i = 0; i < indices.Count; i += 3)
-        {
-            int i1 = indices[i];
-            int i2 = indices[i + 1];
-            int i3 = indices[i + 2];
+        //for (var i = 0; i < indices.Count; i += 3)
+        //{
+        //    int i1 = indices[i];
+        //    int i2 = indices[i + 1];
+        //    int i3 = indices[i + 2];
 
-            var v1 = vertices[i1];
-            var v2 = vertices[i2];
-            var v3 = vertices[i3];
+        //    var v1 = vertices[i1];
+        //    var v2 = vertices[i2];
+        //    var v3 = vertices[i3];
 
-            var normal = Vector3.Cross(v2.position - v1.position, v3.position - v2.position).normalized * 10;
-            Gizmos.color = UnityEngine.Color.cyan;
-            Gizmos.DrawLine(v1.position, v1.position + normal);
-            Gizmos.DrawLine(v2.position, v2.position + normal);
-            Gizmos.DrawLine(v3.position, v3.position + normal);
-        }
+        //    var normal = Vector3.Cross(v2.position - v1.position, v3.position - v2.position).normalized * 10;
+        //    Gizmos.color = UnityEngine.Color.cyan;
+        //    Gizmos.DrawLine(v1.position, v1.position + normal);
+        //    Gizmos.DrawLine(v2.position, v2.position + normal);
+        //    Gizmos.DrawLine(v3.position, v3.position + normal);
+        //}
     }
 }
