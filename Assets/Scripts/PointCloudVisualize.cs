@@ -3,10 +3,13 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
+using static DelaunayTriangulation;
 
 [ExecuteInEditMode]
-public class PontCloudVisualize : MonoBehaviour
+public class PointCloudVisualize : MonoBehaviour
 {
+    public static PointCloudVisualize instance { get; set; } //Singleton
+
     [Serializable]
     public class Vertex
     {
@@ -20,51 +23,70 @@ public class PontCloudVisualize : MonoBehaviour
         }
     }
 
-    [SerializeField] GameObject point;
-    [SerializeField] GameObject pointParent;
+    [Header("File")]
     [SerializeField] TextAsset pointCloudFile;
+    
+    [Header("Simulation")]
+    [SerializeField] bool runSimulation;
+    [SerializeField] bool showGizmo;
+
+    [Header("Gismo")]
+    [SerializeField] int pointsJumpedOver = 1000;
     [SerializeField] float pointSize = 1;
+    [SerializeField] Color gismoColor;
 
-    public List<Vertex> vertices = new List<Vertex>();
+    [Header("Vertices")]
     [SerializeField] int verticesSize = 0;
+    List<Vertex> vertices = new List<Vertex>();
+    bool posisionIsCorrected;
 
-    [SerializeField] bool posisionIsCorrected;
-    List<GameObject> pointList = new List<GameObject>();
 
-    private void Start()
+    //--------------------
+
+
+    private void Awake()
     {
-        //DeleteAllPoints();
+        //Singleton
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+        }
+        else
+        {
+            instance = this;
+        }
+    }
+    private void Update()
+    {
+        if (runSimulation)
+        {
+            ReadVertexData();
+            CorrectPointPosition();
 
-        ReadVertexData();
-        ChangePosition();
-        SpawnPoints();
-
-        ChangePointSize();
-        GetVerticesSize();
+            Triangulate();
+        }
+        else
+        {
+            if (vertices.Count > 0)
+            {
+                vertices.Clear();
+                verticesSize = 0;
+            }
+        }
     }
 
 
-    void DeleteAllPoints()
-    {
-        if (pointList.Count < 0)
-        {
-            return;
-        }
+    //--------------------
 
-        for (int i = 0; i < pointList.Count; i++)
-        {
-            DestroyImmediate(pointList[i].gameObject);
-        }
-
-        pointList.Clear();
-    }
 
     void ReadVertexData()
     {
-        if (pointList.Count >= vertices.Count && vertices.Count != 0)
+        if (vertices.Count > 0)
         {
             return;
         }
+
+        posisionIsCorrected = false;
 
         //Where to split lines
         var fileDelimiters = new[] { "\r\n", "\r", "\n" };
@@ -91,7 +113,7 @@ public class PontCloudVisualize : MonoBehaviour
         }
 
         //Split all lines based on the first line number
-        for (int i = 1; i <= numVertices; i++)
+        for (int i = 1; i <= numVertices; i += pointsJumpedOver)
         {
             var elements = lines[i].Split(lineDelimiters, System.StringSplitOptions.RemoveEmptyEntries);
 
@@ -105,14 +127,15 @@ public class PontCloudVisualize : MonoBehaviour
             Vertex vertex = new Vertex(new Vector3
                 (
                     float.Parse(elements[0], CultureInfo.InvariantCulture),
-                    float.Parse(elements[1], CultureInfo.InvariantCulture),
-                    float.Parse(elements[2], CultureInfo.InvariantCulture))
+                    float.Parse(elements[2], CultureInfo.InvariantCulture),
+                    float.Parse(elements[1], CultureInfo.InvariantCulture))
                 );
 
             vertices.Add(vertex);
+            verticesSize = vertices.Count;
         }
     }
-    void ChangePosition()
+    void CorrectPointPosition()
     {
         if (posisionIsCorrected)
         {
@@ -154,48 +177,48 @@ public class PontCloudVisualize : MonoBehaviour
             }
         }
 
-        print("minValue.x = " + minValue.x + " | minValue.y = " + minValue.y + " | minValue.z = " + minValue.z);
-        print("maxValue.x = " + maxValue.x + " | maxValue.y = " + maxValue.y + " | maxValue.z = " + maxValue.z);
+        //print("minValue.x = " + minValue.x + " | minValue.y = " + minValue.y + " | minValue.z = " + minValue.z);
+        //print("maxValue.x = " + maxValue.x + " | maxValue.y = " + maxValue.y + " | maxValue.z = " + maxValue.z);
+        //print("Difference.x = " + (maxValue.x - minValue.x) + " | Difference.y = " + (maxValue.y - minValue.y) + " | Difference.z = " + (maxValue.z - minValue.z));
 
         //Change Point Position based on new Min/Max
         for (int i = 0; i < vertices.Count; i++)
         {
+            //Length and Width
             vertices[i].position.x -= minValue.x;
-            vertices[i].position.y -= minValue.y;
             vertices[i].position.z -= minValue.z;
-        }
 
-        for (int i = 0; i < pointList.Count; i++)
-        {
-            pointList[i].transform.position = vertices[i].position;
+            //Height
+            vertices[i].position.y *= 2;
+            vertices[i].position.y -= 300;
         }
 
         posisionIsCorrected = true;
     }
-    void SpawnPoints()
+
+
+    //--------------------
+
+    void Triangulate()
     {
-        if (pointList.Count >= vertices.Count && vertices.Count != 0)
+        //List<Tetrahedron> tetrahedra = Triangulate(vertices);
+    }
+
+    void OnDrawGizmos()
+    {
+        if (!showGizmo)
         {
             return;
         }
 
-        for (int i = 0; i < vertices.Count; i++)
+        // For each triangle
+        for (var i = 0; i < vertices.Count; i += 3)
         {
-            pointList.Add(Instantiate(point, new Vector3(vertices[i].position.x, vertices[i].position.y, vertices[i].position.z), Quaternion.identity) as GameObject);
-            pointList[i].transform.parent = pointParent.transform;
-        }
-    }
+            //Color
+            Gizmos.color = gismoColor;
 
-
-    void ChangePointSize()
-    {
-        for (int i = 0; i < vertices.Count; i++)
-        {
-            pointList[i].transform.localScale = new Vector3(pointSize, pointSize, pointSize);
+            //Cube
+            Gizmos.DrawCube(vertices[i].position, new Vector3(pointSize, pointSize, pointSize));
         }
-    }
-    void GetVerticesSize()
-    {
-        verticesSize = vertices.Count;
     }
 }
