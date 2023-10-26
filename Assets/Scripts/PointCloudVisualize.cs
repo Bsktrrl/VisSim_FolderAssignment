@@ -257,7 +257,6 @@ public class PointCloudVisualize : MonoBehaviour
         }
 
         Triangulate();
-        BuildMesh();
 
         triangulateIsFinished = true;
     }
@@ -268,8 +267,19 @@ public class PointCloudVisualize : MonoBehaviour
         meshToSpawn = new Mesh();
         vertices_After = new List<Vector3>();
 
+        //Swap .y and .z so that the Up (y) is last (z)
+        List<Vector3> vertices_Temp = new List<Vector3>();
+        for (int i = 0; i < vertices_PointCloud.Count; i++)
+        {
+            float x = vertices_PointCloud[i].x;
+            float y = vertices_PointCloud[i].z;
+            float z = vertices_PointCloud[i].y;
+
+            vertices_Temp.Add(new Vector3(x, y, z));
+        }
+
         //Consruct a mesh based on a set resolution
-        vertices_After = GetVertices(vertices_PointCloud, resolution);
+        vertices_After = GetVertices(vertices_Temp, resolution);
         meshToSpawn.vertices = vertices_After.ToArray();
 
         // calculate triangles based on the resolution 
@@ -406,17 +416,6 @@ public class PointCloudVisualize : MonoBehaviour
         return indexes;
     }
 
-    private void BuildMesh()
-    {
-        //Spawn Mesh
-        //meshToSpawn = new Mesh
-        //{
-        //    vertices = verticesAfter.Select(v => v).ToArray(),
-        //    triangles = heightmap
-        //};
-
-        //GetComponent<MeshFilter>().mesh = meshToSpawn;
-    }
 
     //--------------------
 
