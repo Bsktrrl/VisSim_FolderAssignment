@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -34,6 +35,7 @@ public class PointCloudVisualize : MonoBehaviour
     //--------------------
 
 
+    #region Variables
     [Header("File")]
     [SerializeField] TextAsset pointCloudFile;
     [SerializeField] TextAsset generatedMeshFile_Vertices;
@@ -47,7 +49,7 @@ public class PointCloudVisualize : MonoBehaviour
     [SerializeField] bool showGizmo;
 
     [Header("Gismo")]
-    [SerializeField] int resolution = 500;
+    public int resolution = 500;
     [SerializeField] int pointsJumpedOver = 1000;
     [SerializeField] float pointSize = 1;
     [SerializeField] Color gismoColor;
@@ -58,7 +60,8 @@ public class PointCloudVisualize : MonoBehaviour
     [SerializeField] int verticesSizeAfter = 0;
     List<Vector3> vertices_PointCloud = new List<Vector3>();
     List<int> indices_PointCloud = new List<int>();
-    List<Vector3> vertices_After;
+    List<Vector3> vertices_After = new List<Vector3>();
+    
     bool posisionIsCorrected;
     bool triangulateIsFinished;
     bool generatedFromMesh;
@@ -82,10 +85,11 @@ public class PointCloudVisualize : MonoBehaviour
     [SerializeField] Mesh mesh;
     [SerializeField] Material material;
 
-    Mesh meshToSpawn;
+    public Mesh meshToSpawn;
     List<Vector3> vertex_Position = new List<Vector3>();
     List<int> vertex_Indices = new List<int>();
     List<Vector3> vertex_Normals = new List<Vector3>();
+    #endregion
 
 
     //--------------------
@@ -103,6 +107,21 @@ public class PointCloudVisualize : MonoBehaviour
             instance = this;
         }
     }
+    private void Start()
+    {
+        ReadFileData_Vertices();
+        ReadFileData_Indices();
+
+        CalculateWidthHeight();
+
+        BuildMesh();
+
+        //ReadVertexData();
+        //CorrectPointPosition();
+        //TriangulatePoints();
+
+        generatedFromMesh = true;
+    }
     private void Update()
     {
         if (runSimulation)
@@ -112,12 +131,12 @@ public class PointCloudVisualize : MonoBehaviour
                 return;
             }
 
-            print("Simulation is Running");
-
             if (generateFromMesh)
             {
                 ReadFileData_Vertices();
                 ReadFileData_Indices();
+
+                CalculateWidthHeight();
 
                 BuildMesh();
 
@@ -138,8 +157,6 @@ public class PointCloudVisualize : MonoBehaviour
             {
                 return;
             }
-
-            print("Simulation is Not Running");
 
             vertices_PointCloud.Clear();
             indices_PointCloud.Clear();
@@ -166,6 +183,11 @@ public class PointCloudVisualize : MonoBehaviour
 
             programIsOff = true;
         }
+
+        //if (indices_PointCloud.Count > 0 && vertices_PointCloud.Count > 0)
+        //{
+        //    CalculateNormals();
+        //}
     }
 
 
@@ -229,7 +251,7 @@ public class PointCloudVisualize : MonoBehaviour
             vertices_PointCloud.Add(vertex);
         }
 
-        print("vertices.size: " + vertices_PointCloud.Count);
+        //print("vertices.size: " + vertices_PointCloud.Count);
     }
     void ReadFileData_Indices()
     {
@@ -290,8 +312,9 @@ public class PointCloudVisualize : MonoBehaviour
             indices_PointCloud.Add(int.Parse(elements[2]));
         }
 
-        print("indices.size: " + indices_PointCloud.Count);
+        //print("indices.size: " + indices_PointCloud.Count);
     }
+    
     void ReadVertexData()
     {
         if (vertices_PointCloud.Count > 0)
@@ -413,6 +436,7 @@ public class PointCloudVisualize : MonoBehaviour
 
     //--------------------
 
+
     void BuildMesh()
     {
         meshToSpawn = new Mesh();
@@ -423,6 +447,41 @@ public class PointCloudVisualize : MonoBehaviour
         meshToSpawn.RecalculateNormals();
         GetComponent<MeshFilter>().mesh = meshToSpawn;
     }
+
+    void CalculateWidthHeight()
+    {
+        if (vertices_PointCloud.Count <= 0)
+        {
+            return;
+        }
+
+        xmin = vertices_PointCloud[0].x;
+        float xmax = vertices_PointCloud[0].x;
+        ymin = vertices_PointCloud[0].y;
+        float ymax = vertices_PointCloud[0].y;
+        zmin = vertices_PointCloud[0].z;
+
+        // Search for x/y min-max
+        for (int i = 0; i < vertices_PointCloud.Count; i++)
+        {
+            if (vertices_PointCloud[i] == Vector3.zero) continue;
+
+            if (vertices_PointCloud[i].x < xmin) xmin = vertices_PointCloud[i].x;
+            if (vertices_PointCloud[i].x > xmax) xmax = vertices_PointCloud[i].x;
+            if (vertices_PointCloud[i].z < ymin) ymin = vertices_PointCloud[i].z;
+            if (vertices_PointCloud[i].z > ymax) ymax = vertices_PointCloud[i].z;
+            if (vertices_PointCloud[i].y < zmin) zmin = vertices_PointCloud[i].y;
+        }
+
+        float width = xmax - xmin;
+        float height = ymax - ymin;
+        vertex_width = width / resolution;
+        vertex_height = height / resolution;
+
+        print("Widht: " + vertex_width + " | height: " + vertex_height);
+    }
+
+
     void TriangulatePoints()
     {
         if (triangulateIsFinished)
@@ -620,54 +679,177 @@ public class PointCloudVisualize : MonoBehaviour
     //--------------------
 
 
-    public Hit GetCollision(Vector2 position)
+    void CalculateNormals()
     {
-        var hit = new Hit();
-        hit.position.x = position.x;
-        hit.position.z = position.y;
-
-        for (var i = 0; i < vertex_Indices.Count; i += 3)
+        for (var i = 0; i < indices_PointCloud.Count; i += 3)
         {
-            int i1 = vertex_Indices[i];
-            int i2 = vertex_Indices[i + 1];
-            int i3 = vertex_Indices[i + 2];
+            int i1 = indices_PointCloud[i];
+            int i2 = indices_PointCloud[i + 1];
+            int i3 = indices_PointCloud[i + 2];
 
-            var v1 = vertex_Position[i1];
-            var v2 = vertex_Position[i2];
-            var v3 = vertex_Position[i3];
+            var v1 = vertices_PointCloud[i1];
+            var v2 = vertices_PointCloud[i2];
+            var v3 = vertices_PointCloud[i3];
 
-            var v1n = new Vector2(v1.x, v1.z);
-            var v2n = new Vector2(v2.x, v2.z);
-            var v3n = new Vector2(v3.x, v3.z);
+            var normal = Vector3.Cross(v2 - v1, v3 - v2).normalized;
+            v1 += normal;
+            v2 += normal;
+            v3 += normal;
+        }
 
-            Vector3 temp = Barycentric(v1n, v2n, v3n, position);
-
-            if (temp.x is >= 0f and <= 1f && temp.y is >= 0f and <= 1f && temp.z is >= 0f and <= 1f)
+        vertices_PointCloud.ForEach(v => v = v.normalized);
+    }
+    public int FindMapPos(float x, float z)
+    {
+        for (int i = 0; i < vertices_PointCloud.Count; i++)
+        {
+            if (vertices_PointCloud[i].x <= x && vertices_PointCloud[i].x + vertex_width > x && vertices_PointCloud[i].z <= z && vertices_PointCloud[i].z + vertex_height > z)
             {
-                var y = vertex_Position[i1].y * temp.x + vertex_Position[i2].y * temp.y + vertex_Position[i3].y * temp.z;
-
-                hit.position.y = y;
-
-                hit.normal = Vector3.Cross(v2 - v1, v3 - v2).normalized;
-                hit.isHit = true;
-
-                //Corrigate y
-                //Vector3 p = hit.position;
-                //Vector3 c = position;
-                //Vector3 d = p - c;
-                //Vector3 n = hit.normal;
-
-                //var k = c + (Vector3.Dot(d, n) * n);
-
-                return hit;
+                return i;
             }
         }
 
-        return hit;
+        //for (int i = 0; i < vertices_PointCloud.Count; i++)
+        //{
+        //    if (i % resolution != resolution - 1 && (i / resolution) != resolution - 1)
+        //    {
+        //        if (vertices_PointCloud[i].x <= x && vertices_PointCloud[i + 1].x > x && vertices_PointCloud[i].z <= z && vertices_PointCloud[i + resolution].z > z)
+        //        {
+        //            return i;
+        //        }
+        //    }
+        //}
+
+        return -1;
     }
 
-    public static Vector3 Barycentric(Vector2 a, Vector2 b, Vector2 c, Vector2 p)
+    public Hit GetCollision(Vector2 position, int mapPos)
     {
+        #region Adrians GetCollision
+        ////print("Position: " + position);
+
+        //var hit = new Hit();
+        //hit.position.x = position.x;
+        //hit.position.z = position.y;
+
+        ////Check out of bounds
+        //if ((mapPos) >= vertices_PointCloud.Count || mapPos < 0)
+        //{
+        //    print("0: " + vertices_PointCloud.Count + " | " + (mapPos));
+        //    return new Hit() { isHit = false };
+        //}
+        //if ((mapPos + 1) >= vertices_PointCloud.Count)
+        //{
+        //    print("1: " + vertices_PointCloud.Count + " | " + (mapPos + 1));
+        //    return new Hit() { isHit = false };
+        //}
+        //if ((mapPos + resolution) >= vertices_PointCloud.Count)
+        //{
+        //    print("2");
+        //    return new Hit() { isHit = false };
+        //}
+        //if ((mapPos + resolution + 1) >= vertices_PointCloud.Count)
+        //{
+        //    print("3");
+        //    return new Hit() { isHit = false };
+        //}
+
+        //Vector3 p = vertices_PointCloud[mapPos];
+        //Vector3 q = vertices_PointCloud[mapPos + 1];
+        //Vector3 r = vertices_PointCloud[mapPos + resolution];
+        //Vector3 s = vertices_PointCloud[mapPos + resolution + 1];
+
+        //print("P: " + p.y + " | Q: " + q.y + " | r: " + r.y);
+
+        //Vector3 temp = Barycentric(p, q, r, position);
+        //Vector3 temp2 = Barycentric(q, s, r, position);
+
+        //print("Temp: " + temp + " | Temp2: " + temp2);
+
+        //if (temp.x >= 0f && temp.x <= 1f && temp.y >= 0f && temp.y <= 1f && temp.z >= 0f && temp.z <= 1f)
+        //{
+        //    float y = (p.y * temp.x) + (q.y * temp.y) + (r.y * temp.z);
+
+        //    hit.position.y = y;
+
+        //    hit.normal = Vector3.Cross(q - p, r - p).normalized;
+        //    hit.isHit = true;
+
+        //    return hit;
+        //}
+        //if (temp2.x >= 0f && temp2.x <= 1f && temp2.y >= 0f && temp2.y <= 1f && temp2.z >= 0f && temp2.z <= 1f)
+        //{
+        //    float y = (q.y * temp2.x) + (s.y * temp2.y) + (r.y * temp2.z);
+
+        //    hit.position.y = y;
+
+        //    hit.normal = Vector3.Cross(s - q, r - q).normalized;
+        //    hit.isHit = true;
+
+        //    return hit;
+        //}
+        #endregion
+
+        #region Aleksanders GetCollision
+
+
+        #endregion
+
+
+        //for (var i = 0; i < meshToSpawn.triangles.Length; i += 3)
+        //{
+        //    int i1 = meshToSpawn.triangles[i];
+        //    int i2 = meshToSpawn.triangles[i + 1];
+        //    int i3 = meshToSpawn.triangles[i + 2];
+
+        //    var v1 = meshToSpawn.vertices[i1];
+        //    var v2 = meshToSpawn.vertices[i2];
+        //    var v3 = meshToSpawn.vertices[i3];
+
+        //    var v1n = new Vector2(v1.x, v1.z);
+        //    var v2n = new Vector2(v2.x, v2.z);
+        //    var v3n = new Vector2(v3.x, v3.z);
+
+        //    Vector3 temp = Barycentric(v1n, v2n, v3n, position);
+
+        //    if (temp.x >= 0f && temp.x <= 1f && temp.y >= 0f && temp.y <= 1f && temp.z >= 0f && temp.z <= 1f)
+        //    {
+        //        //print("Success: " + i);
+
+        //        float y = meshToSpawn.vertices[i1].y * temp.x + meshToSpawn.vertices[i2].y * temp.y + meshToSpawn.vertices[i3].y * temp.z;
+
+        //        hit.position.y = y;
+
+        //        hit.normal = Vector3.Cross(v2 - v1, v3 - v2).normalized;
+        //        hit.isHit = true;
+
+        //        return hit;
+        //    }
+        //}
+
+        return new Hit();
+    }
+
+
+    static Vector3 Barycentric(Vector2 a, Vector2 b, Vector2 c, Vector2 p)
+    {
+        //Vector2 PQ = Q - P;
+        //Vector2 PR = R - P;
+
+        //Vector3 PQR = Cross2D(PQ, PR);
+        //float normal = PQR.magnitude;
+
+
+        //Vector2 XP = P - X;
+        //Vector2 XQ = Q - X;
+        //Vector2 XR = R - X;
+
+        //float x = Cross2D(XP, XQ).z / normal;
+        //float y = Cross2D(XQ, XR).z / normal;
+        //float z = Cross2D(XR, XP).z / normal;
+
+        //return new Vector3(x, y, z);
+
         Vector2 v0 = b - a;
         Vector2 v1 = c - a;
         Vector2 v2 = p - a;
@@ -686,6 +868,101 @@ public class PointCloudVisualize : MonoBehaviour
         u = 1.0f - v - w;
 
         return new Vector3(u, v, w);
+    }
+
+
+
+
+    //--------------------
+
+
+    public Vector3 CheckCollission(Vector3 pos, Vector3 vel, int index, float r)
+    {
+        Vector2 X = new Vector2(pos.x, pos.z);
+
+        List<Vector3> ALL = GetSquare(index);
+
+        Vector2 P = new Vector2(ALL[0].x, ALL[0].z);
+        Vector2 Q = new Vector2(ALL[2].x, ALL[2].z);
+        Vector2 R = new Vector2(ALL[1].x, ALL[1].z);
+
+
+        Vector3 bary1 = Bary(X, Q, R, P);
+
+        P = new Vector2(ALL[1].x, ALL[1].z);
+        Q = new Vector2(ALL[2].x, ALL[2].z);
+        R = new Vector2(ALL[3].x, ALL[3].z);
+
+        Vector3 bary2 = Bary(X, Q, R, P);
+
+        if (bary1.x >= 0f && bary1.x <= 1f && bary1.y >= 0f && bary1.y <= 1f && bary1.z >= 0f && bary1.z <= 1f)
+        {
+            float y = bary1.x * ALL[0].y + bary1.y * ALL[2].y + bary1.z * ALL[1].y;
+            float distance = Mathf.Abs(pos.y - y);
+
+            if (distance < r)
+            {
+                Vector3 PQ = ALL[2] - ALL[0];
+                Vector3 PR = ALL[1] - ALL[0];
+
+                Vector3 normal_unit_vector = Vector3.Cross(PQ, PR);
+                normal_unit_vector = normal_unit_vector.normalized;
+
+                return normal_unit_vector;
+            }
+        }
+        else if (bary2.x >= 0f && bary2.x <= 1f && bary2.y >= 0f && bary2.y <= 1f && bary2.z >= 0f && bary2.z <= 1f)
+        {
+            float y = (bary2.x * ALL[1].y) + (bary2.y * ALL[2].y) + (bary2.z * ALL[3].y);
+            float distance = Mathf.Abs(pos.y - y);
+
+            if (distance < r)
+            {
+                Vector3 PQ = ALL[2] - ALL[1];
+                Vector3 PR = ALL[3] - ALL[1];
+                Vector3 normal_unit_vector = Vector3.Cross(PQ, PR);
+                normal_unit_vector = normal_unit_vector.normalized;
+                return normal_unit_vector;
+            }
+        }
+
+        return Vector3.one * -1f;
+    }
+
+    Vector3 Bary(Vector2 playerxz, Vector2 P, Vector2 Q, Vector2 R)
+    {
+        Vector2 PQ = Q - P;
+        Vector2 PR = R - P;
+        Vector3 PQR = Cross2D(PQ, PR);
+        float normal = PQR.magnitude;
+        Vector2 XP = P - playerxz;
+        Vector2 XQ = Q - playerxz;
+        Vector2 XR = R - playerxz;
+        float x = Cross2D(XP, XQ).z / normal;
+        float y = Cross2D(XQ, XR).z / normal;
+        float z = Cross2D(XR, XP).z / normal;
+        return new Vector3(x, y, z);
+    }
+    Vector3 Cross2D(Vector2 A, Vector2 B)
+    {
+        Vector3 cross = new Vector3();
+        cross.z = (A.x * B.y) - (A.y * B.x);
+        return cross;
+    }
+
+    public List<Vector3> GetSquare(int index)
+    {
+        print("index: " + index);
+
+        List<Vector3> result = new List<Vector3>()
+            {
+                vertices_PointCloud[index],
+                vertices_PointCloud[index + 1],
+                vertices_PointCloud[index + resolution],
+                vertices_PointCloud[index + resolution + 1]
+            };
+
+        return result;
     }
 
 
@@ -709,4 +986,10 @@ public class PointCloudVisualize : MonoBehaviour
             Gizmos.DrawCube(new Vector3(vertices_PointCloud[i].x, vertices_PointCloud[i].y, vertices_PointCloud[i].z), new Vector3(pointSize, pointSize, pointSize));
         }
     }
+}
+
+public struct Int2
+{
+    public int x;
+    public int y;
 }
