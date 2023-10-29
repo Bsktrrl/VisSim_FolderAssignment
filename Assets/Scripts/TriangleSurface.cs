@@ -4,7 +4,6 @@ using System.Linq;
 using System.Globalization;
 using System;
 
-[ExecuteInEditMode]
 public class TriangleSurface : MonoBehaviour
 {
     public struct Hit
@@ -69,7 +68,7 @@ public class TriangleSurface : MonoBehaviour
         var fileDelimiters = new[] { "\r\n", "\r", "\n" };
 
         //What seperates the numbers on the line
-        var lineDelimiters = new[] { '(', ')', ',' };
+        var lineDelimiters = new[] { ' ', ' ', ' ' };
 
         //Split the lines into a string-array
         var lines = vertexFile.text.Split(fileDelimiters, System.StringSplitOptions.RemoveEmptyEntries);

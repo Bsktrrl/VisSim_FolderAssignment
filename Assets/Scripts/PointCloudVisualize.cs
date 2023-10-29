@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,6 +11,26 @@ using UnityEngine;
 public class PointCloudVisualize : MonoBehaviour
 {
     public static PointCloudVisualize instance { get; set; } //Singleton
+
+    public struct Hit
+    {
+        public Vector3 position;
+        public Vector3 normal;
+        public bool isHit;
+    }
+
+    [Serializable]
+    public class Vertex
+    {
+        public Vector3 position;
+        public Vector3 normal;
+
+        public Vertex(Vector3 _pos, Vector3 _normal = new())
+        {
+            position = _pos;
+            normal = _normal;
+        }
+    }
 
 
     //--------------------
@@ -58,6 +79,9 @@ public class PointCloudVisualize : MonoBehaviour
     int cachedInstanceCount = -1;
 
     Mesh meshToSpawn;
+    List<Vector3> vertex_Position = new List<Vector3>();
+    List<int> vertex_Indices = new List<int>();
+    List<Vector3> vertex_Normals = new List<Vector3>();
 
 
     //--------------------
@@ -258,13 +282,27 @@ public class PointCloudVisualize : MonoBehaviour
 
         Triangulate();
 
+        var hit = GetCollision(new Vector2(15.19f, 15.19f));
+
+        print($"New Hit: {hit.isHit}");
+        print($"New Pos: {hit.position}");
+        print($"New Norm: {hit.normal}");
+
         triangulateIsFinished = true;
     }
 
     void Triangulate()
     {
         // Create a mesh object and a vertices array
-        meshToSpawn = new Mesh();
+        //meshToSpawn = new Mesh();
+
+        //Spawn Mesh
+        meshToSpawn = new Mesh
+        {
+            vertices = vertex_Position.ToArray(),
+            triangles = vertex_Indices.ToArray()
+        };
+
         vertices_After = new List<Vector3>();
 
         //Swap .y and .z so that the Up (y) is last (z)
@@ -279,18 +317,32 @@ public class PointCloudVisualize : MonoBehaviour
         }
 
         //Consruct a mesh based on a set resolution
-        vertices_After = GetVertices(vertices_Temp, resolution);
-        meshToSpawn.vertices = vertices_After.ToArray();
+        vertex_Position = GetVertices(vertices_Temp, resolution);
+        vertices_After = vertex_Position;
+        meshToSpawn.vertices = vertex_Position.ToArray();
 
         // calculate triangles based on the resolution 
-        meshToSpawn.triangles = GetTriangles(resolution).ToArray();
+        vertex_Indices = GetTriangles(resolution);
+        meshToSpawn.triangles = vertex_Indices.ToArray();
+
         meshToSpawn.RecalculateNormals();
-        meshFilter.mesh = meshToSpawn;
+        //meshFilter.mesh = meshToSpawn;
+
+        GetComponent<MeshFilter>().mesh = meshToSpawn;
+        
 
         //Save the new constucted mesh to a text file
         if (generateMeshToTxt)
         {
-            TextReaderWriter.WriteText(AssetDatabase.GenerateUniqueAssetPath("Assets/DataFiles/generatedMesh.txt"), vertices_After);
+            TextReaderWriter.WriteText(AssetDatabase.GenerateUniqueAssetPath("Assets/DataFiles/generatedMesh_vertices.txt"), vertex_Position);
+
+            List<Vector3> temp_indices = new List<Vector3>();
+            for (int i = 0; i < vertex_Indices.Count; i += 3)
+            {
+                temp_indices.Add(new Vector3(vertex_Indices[i], vertex_Indices[i + 1], vertex_Indices[i + 2]));
+            }
+
+            TextReaderWriter.WriteText(AssetDatabase.GenerateUniqueAssetPath("Assets/DataFiles/generatedMesh_indices.txt"), temp_indices);
         }
 
         // save the heightmap in a float array so we can use it 
@@ -414,6 +466,78 @@ public class PointCloudVisualize : MonoBehaviour
         }
 
         return indexes;
+    }
+
+
+    //--------------------
+
+
+    public Hit GetCollision(Vector2 position)
+    {
+        var hit = new Hit();
+        hit.position.x = position.x;
+        hit.position.z = position.y;
+
+        for (var i = 0; i < vertex_Indices.Count; i += 3)
+        {
+            int i1 = vertex_Indices[i];
+            int i2 = vertex_Indices[i + 1];
+            int i3 = vertex_Indices[i + 2];
+
+            var v1 = vertex_Position[i1];
+            var v2 = vertex_Position[i2];
+            var v3 = vertex_Position[i3];
+
+            var v1n = new Vector2(v1.x, v1.z);
+            var v2n = new Vector2(v2.x, v2.z);
+            var v3n = new Vector2(v3.x, v3.z);
+
+            Vector3 temp = Barycentric(v1n, v2n, v3n, position);
+
+            if (temp.x is >= 0f and <= 1f && temp.y is >= 0f and <= 1f && temp.z is >= 0f and <= 1f)
+            {
+                var y = vertex_Position[i1].y * temp.x + vertex_Position[i2].y * temp.y + vertex_Position[i3].y * temp.z;
+
+                hit.position.y = y;
+
+                hit.normal = Vector3.Cross(v2 - v1, v3 - v2).normalized;
+                hit.isHit = true;
+
+                //Corrigate y
+                //Vector3 p = hit.position;
+                //Vector3 c = position;
+                //Vector3 d = p - c;
+                //Vector3 n = hit.normal;
+
+                //var k = c + (Vector3.Dot(d, n) * n);
+
+                return hit;
+            }
+        }
+
+        return hit;
+    }
+
+    public static Vector3 Barycentric(Vector2 a, Vector2 b, Vector2 c, Vector2 p)
+    {
+        Vector2 v0 = b - a;
+        Vector2 v1 = c - a;
+        Vector2 v2 = p - a;
+
+        float d00 = Vector2.Dot(v0, v0);
+        float d01 = Vector2.Dot(v0, v1);
+        float d11 = Vector2.Dot(v1, v1);
+        float d20 = Vector2.Dot(v2, v0);
+        float d21 = Vector2.Dot(v2, v1);
+
+        float denom = d00 * d11 - d01 * d01;
+
+        float u, v, w;
+        v = (d11 * d20 - d01 * d21) / denom;
+        w = (d00 * d21 - d01 * d20) / denom;
+        u = 1.0f - v - w;
+
+        return new Vector3(u, v, w);
     }
 
 
