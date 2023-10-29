@@ -1,9 +1,7 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 
@@ -38,12 +36,15 @@ public class PointCloudVisualize : MonoBehaviour
 
     [Header("File")]
     [SerializeField] TextAsset pointCloudFile;
+    [SerializeField] TextAsset generatedMeshFile_Vertices;
+    [SerializeField] TextAsset generatedMeshFile_Indices;
     [SerializeField] MeshFilter meshFilter;
 
     [Header("Simulation")]
     [SerializeField] bool runSimulation;
-    [SerializeField] bool showGizmo;
+    [SerializeField] bool generateFromMesh;
     [SerializeField] bool generateMeshToTxt;
+    [SerializeField] bool showGizmo;
 
     [Header("Gismo")]
     [SerializeField] int resolution = 500;
@@ -53,10 +54,15 @@ public class PointCloudVisualize : MonoBehaviour
 
     [Header("Vertices")]
     [SerializeField] int verticesSize = 0;
+    [SerializeField] int indicesSize = 0;
+    [SerializeField] int verticesSizeAfter = 0;
     List<Vector3> vertices_PointCloud = new List<Vector3>();
+    List<int> indices_PointCloud = new List<int>();
     List<Vector3> vertices_After;
     bool posisionIsCorrected;
     bool triangulateIsFinished;
+    bool generatedFromMesh;
+    public bool programIsOff;
 
     [Header("Other")]
     float xmin;
@@ -75,8 +81,6 @@ public class PointCloudVisualize : MonoBehaviour
 
     [SerializeField] Mesh mesh;
     [SerializeField] Material material;
-
-    int cachedInstanceCount = -1;
 
     Mesh meshToSpawn;
     List<Vector3> vertex_Position = new List<Vector3>();
@@ -103,34 +107,64 @@ public class PointCloudVisualize : MonoBehaviour
     {
         if (runSimulation)
         {
-            ReadVertexData();
-            CorrectPointPosition();
+            if (!programIsOff)
+            {
+                return;
+            }
 
-            TriangulatePoints();
+            print("Simulation is Running");
+
+            if (generateFromMesh)
+            {
+                ReadFileData_Vertices();
+                ReadFileData_Indices();
+
+                BuildMesh();
+
+                generatedFromMesh = true;
+            }
+            else
+            {
+                ReadVertexData();
+                CorrectPointPosition();
+                TriangulatePoints();
+            }
+
+            programIsOff = false;
         }
         else
         {
-            if (vertices_PointCloud.Count > 0)
+            if (programIsOff)
             {
-                vertices_PointCloud.Clear();
-                verticesSize = 0;
-
-                min = Vector2.zero;
-                max = Vector2.zero;
-
-                heightmap = null;
-
-                xmin = 0;
-                ymin = 0;
-                zmin = 0;
-
-                vertex_width = 0;
-                vertex_height = 0;
-
-                vertices_After.Clear();
-
-                meshFilter.mesh = null;
+                return;
             }
+
+            print("Simulation is Not Running");
+
+            vertices_PointCloud.Clear();
+            indices_PointCloud.Clear();
+            verticesSize = 0;
+            verticesSizeAfter = 0;
+
+            min = Vector2.zero;
+            max = Vector2.zero;
+
+            heightmap = null;
+
+            xmin = 0;
+            ymin = 0;
+            zmin = 0;
+
+            vertex_width = 0;
+            vertex_height = 0;
+
+            vertices_After.Clear();
+
+            meshFilter.mesh = null;
+
+            generatedFromMesh = false;
+
+            programIsOff = true;
         }
     }
 
@@ -138,6 +172,126 @@ public class PointCloudVisualize : MonoBehaviour
     //--------------------
 
 
+    void ReadFileData_Vertices()
+    {
+        if (vertices_PointCloud.Count > 0)
+        {
+            return;
+        }
+
+        posisionIsCorrected = false;
+        triangulateIsFinished = false;
+        generatedFromMesh = false;
+
+        //Where to split lines
+        var fileDelimiters = new[] { "\r\n", "\r", "\n" };
+
+        //What seperates the numbers on the line
+        var lineDelimiters = new[] { ' ', ' ', ' ' };
+
+        //Split the lines into a string-array
+        var lines = generatedMeshFile_Vertices.text.Split(fileDelimiters, System.StringSplitOptions.RemoveEmptyEntries);
+
+        if (lines.Length < 1)
+        {
+            print(message: $"{generatedMeshFile_Vertices.name} was empty");
+            return;
+        }
+
+        //Get first line, to see how many lines there will be
+        var numVertices = int.Parse(lines[0]);
+
+        if (numVertices < 1)
+        {
+            print(message: $"{generatedMeshFile_Vertices.name} contains no vertex data");
+            return;
+        }
+
+        //Split all lines based on the first line number
+        for (int i = 1; i <= numVertices; i++)
+        {
+            var elements = lines[i].Split(lineDelimiters, System.StringSplitOptions.RemoveEmptyEntries);
+
+            if (elements.Length < 3)
+            {
+                print(message: $"{generatedMeshFile_Vertices.name} is missing data on line {i}");
+
+                continue;
+            }
+
+            Vector3 vertex = new Vector3
+                (
+                    float.Parse(elements[0]),
+                    float.Parse(elements[1]),
+                    float.Parse(elements[2])
+                );
+
+            vertices_PointCloud.Add(vertex);
+        }
+
+        print("vertices.size: " + vertices_PointCloud.Count);
+    }
+    void ReadFileData_Indices()
+    {
+        if (indices_PointCloud.Count > 0)
+        {
+            return;
+        }
+
+        posisionIsCorrected = false;
+        triangulateIsFinished = false;
+        generatedFromMesh = false;
+
+        //Where to split lines
+        var fileDelimiters = new[] { "\r\n", "\r", "\n" };
+
+        //What seperates the numbers on the line
+        var lineDelimiters = new[] { ' ', ' ', ' ' };
+
+        //Split the lines into a string-array
+        var lines = generatedMeshFile_Indices.text.Split(fileDelimiters, System.StringSplitOptions.RemoveEmptyEntries);
+
+        if (lines.Length < 1)
+        {
+            print(message: $"{generatedMeshFile_Indices.name} was empty");
+            return;
+        }
+
+        //Get first line, to see how many lines there will be
+        var numVertices = int.Parse(lines[0]);
+
+        if (numVertices < 1)
+        {
+            print(message: $"{generatedMeshFile_Indices.name} contains no vertex data");
+            return;
+        }
+
+        //Split all lines based on the first line number
+        for (int i = 1; i <= numVertices; i++)
+        {
+            var elements = lines[i].Split(lineDelimiters, System.StringSplitOptions.RemoveEmptyEntries);
+
+            if (elements.Length < 3)
+            {
+                print(message: $"{generatedMeshFile_Indices.name} is missing data on line {i}");
+
+                continue;
+            }
+
+            Vector3 vertex = new Vector3
+                (
+                    float.Parse(elements[0]),
+                    float.Parse(elements[1]),
+                    float.Parse(elements[2])
+                );
+
+            indices_PointCloud.Add(int.Parse(elements[0]));
+            indices_PointCloud.Add(int.Parse(elements[1]));
+            indices_PointCloud.Add(int.Parse(elements[2]));
+        }
+
+        print("indices.size: " + indices_PointCloud.Count);
+    }
     void ReadVertexData()
     {
         if (vertices_PointCloud.Count > 0)
@@ -152,7 +306,7 @@ public class PointCloudVisualize : MonoBehaviour
         var fileDelimiters = new[] { "\r\n", "\r", "\n" };
 
         //What seperates the numbers on the line
-        var lineDelimiters = new[] { '(', ')', ' ' };
+        var lineDelimiters = new[] { ' ', ' ', ' ' };
 
         //Split the lines into a string-array
         var lines = pointCloudFile.text.Split(fileDelimiters, System.StringSplitOptions.RemoveEmptyEntries);
@@ -184,22 +338,17 @@ public class PointCloudVisualize : MonoBehaviour
                 continue;
             }
 
-            //Vertex vertex = new Vertex(new Vector3
-            //    (
-            //        float.Parse(elements[0], CultureInfo.InvariantCulture),
-            //        float.Parse(elements[2], CultureInfo.InvariantCulture),
-            //        float.Parse(elements[1], CultureInfo.InvariantCulture))
-            //    );
-
-            Vector3 vertex = new Vector3(
+            Vector3 vertex = new Vector3
+                (
                     float.Parse(elements[0], CultureInfo.InvariantCulture),
                     float.Parse(elements[2], CultureInfo.InvariantCulture),
                     float.Parse(elements[1], CultureInfo.InvariantCulture)
                 );
 
             vertices_PointCloud.Add(vertex);
-            verticesSize = vertices_PointCloud.Count;
         }
+
+        verticesSize = vertices_PointCloud.Count;
     }
     void CorrectPointPosition()
     {
@@ -252,18 +401,10 @@ public class PointCloudVisualize : MonoBehaviour
         {
             vertices_PointCloud[i] = new Vector3
                 (
-                    vertices_PointCloud[i].x - minValue.x, 
+                    vertices_PointCloud[i].x - minValue.x,
                     vertices_PointCloud[i].y * 2 - 300,
                     vertices_PointCloud[i].z - minValue.z
                 );
-
-            //Length and Width
-            //vertices_PointCloud[i].x -= minValue.x;
-            //vertices_PointCloud[i].z -= minValue.z;
-
-            ////Height
-            //vertices_PointCloud[i].y *= 2;
-            //vertices_PointCloud[i].y -= 300;
         }
 
         posisionIsCorrected = true;
@@ -272,7 +413,16 @@ public class PointCloudVisualize : MonoBehaviour
 
     //--------------------
 
+    void BuildMesh()
+    {
+        meshToSpawn = new Mesh();
 
+        meshToSpawn.vertices = vertices_PointCloud.ToArray();
+        meshToSpawn.triangles = indices_PointCloud.ToArray();
+
+        meshToSpawn.RecalculateNormals();
+        GetComponent<MeshFilter>().mesh = meshToSpawn;
+    }
     void TriangulatePoints()
     {
         if (triangulateIsFinished)
@@ -282,26 +432,22 @@ public class PointCloudVisualize : MonoBehaviour
 
         Triangulate();
 
-        var hit = GetCollision(new Vector2(15.19f, 15.19f));
+        //var hit = GetCollision(new Vector2(15.19f, 15.19f));
 
-        print($"New Hit: {hit.isHit}");
-        print($"New Pos: {hit.position}");
-        print($"New Norm: {hit.normal}");
+        //print($"New Hit: {hit.isHit}");
+        //print($"New Pos: {hit.position}");
+        //print($"New Norm: {hit.normal}");
 
         triangulateIsFinished = true;
     }
-
     void Triangulate()
     {
-        // Create a mesh object and a vertices array
-        //meshToSpawn = new Mesh();
-
         //Spawn Mesh
-        meshToSpawn = new Mesh
-        {
-            vertices = vertex_Position.ToArray(),
-            triangles = vertex_Indices.ToArray()
-        };
+        meshToSpawn = new Mesh();
+        //{
+        //    vertices = vertex_Position.ToArray(),
+        //    triangles = vertex_Indices.ToArray()
+        //};
 
         vertices_After = new List<Vector3>();
 
@@ -316,10 +462,12 @@ public class PointCloudVisualize : MonoBehaviour
             vertices_Temp.Add(new Vector3(x, y, z));
         }
 
-        //Consruct a mesh based on a set resolution
+        //Construct a mesh based on a set resolution
         vertex_Position = GetVertices(vertices_Temp, resolution);
         vertices_After = vertex_Position;
+
         meshToSpawn.vertices = vertex_Position.ToArray();
+        verticesSizeAfter = meshToSpawn.vertices.Length;
 
         // calculate triangles based on the resolution 
         vertex_Indices = GetTriangles(resolution);
@@ -329,20 +477,19 @@ public class PointCloudVisualize : MonoBehaviour
         //meshFilter.mesh = meshToSpawn;
 
         GetComponent<MeshFilter>().mesh = meshToSpawn;
-        
 
         //Save the new constucted mesh to a text file
         if (generateMeshToTxt)
         {
-            TextReaderWriter.WriteText(AssetDatabase.GenerateUniqueAssetPath("Assets/DataFiles/generatedMesh_vertices.txt"), vertex_Position);
+            TextReaderWriter.WriteText(AssetDatabase.GenerateUniqueAssetPath("Assets/DataFiles/generatedMesh_vertices.txt"), meshToSpawn.vertices.ToList());
 
-            List<Vector3> temp_indices = new List<Vector3>();
-            for (int i = 0; i < vertex_Indices.Count; i += 3)
+            List<Vector3> temp = new List<Vector3>();
+            for (int i = 0; i < meshToSpawn.triangles.Length; i += 3)
             {
-                temp_indices.Add(new Vector3(vertex_Indices[i], vertex_Indices[i + 1], vertex_Indices[i + 2]));
+                temp.Add(new Vector3(meshToSpawn.triangles[i], meshToSpawn.triangles[i + 1], meshToSpawn.triangles[i + 2]));
             }
-
-            TextReaderWriter.WriteText(AssetDatabase.GenerateUniqueAssetPath("Assets/DataFiles/generatedMesh_indices.txt"), temp_indices);
+            
+            TextReaderWriter.WriteText(AssetDatabase.GenerateUniqueAssetPath("Assets/DataFiles/generatedMesh_indices.txt"), temp);
         }
 
         // save the heightmap in a float array so we can use it 
@@ -353,6 +500,7 @@ public class PointCloudVisualize : MonoBehaviour
             heightmap[i] = (int)vertices_After[i].y;
         }
     }
+  
     List<Vector3> GetVertices(List<Vector3> vertex_positions, int resolution)
     {
         // Important to remember that z is the up direction in this array
