@@ -2,24 +2,32 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 
 
 public class Ball : MonoBehaviour
 {
+    [Header("File")]
     //[SerializeField] TriangleSurface triangleSurface;
     [SerializeField] PointCloudVisualize pointCloudVisualize;
-    Vector3 g = Physics.gravity;
-    float m = 1f;
-    float r = 5f;
+
+    Vector3 gravity = Physics.gravity;
+    float mass = 1f;
+    float radius = 5f;
     Vector3 velocity = Vector3.zero;
-    Vector3 oldNormal = Vector3.zero;
+    Vector3 acceleration = new Vector3();
+
+    [Header("Stats")]
     [SerializeField][Range(0, 1)] float bounciness = 0;
 
     Vector3 lastPosition = Vector3.zero;
-    Vector3 startPosition;
+    //Vector3 startPosition;
 
     int mapPos = 0;
+
+    [SerializeField] bool cooldown;
+    [SerializeField] float cooldownTime;
 
 
     //--------------------
@@ -31,21 +39,38 @@ public class Ball : MonoBehaviour
     }
     private void Start()
     {
-        startPosition = transform.position;
+        //startPosition = transform.position;
+        //cooldowntTime = timeAlive;
     }
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
+        //if (Input.GetKeyDown(KeyCode.Space))
+        //{
+        //    transform.position = startPosition;
+        //    velocity = Vector3.zero;
+        //    oldNormal = Vector3.zero;
+        //    lastPosition = Vector3.zero;
+        //}
+
+        if (cooldown)
         {
-            transform.position = startPosition;
-            velocity = Vector3.zero;
-            oldNormal = Vector3.zero;
-            lastPosition = Vector3.zero;
+            cooldownTime -= Time.deltaTime;
+
+            if (cooldownTime <= 0)
+            {
+                RemoveDroplet();
+
+                print("Time Up");
+            }
         }
     }
     private void FixedUpdate()
     {
+        //Perform moving of the gameObject
         Move();
+
+        //Check if gameObject is under the Mesh
+        UnderTheMesh();
     }
 
     void Move()
@@ -55,70 +80,78 @@ public class Ball : MonoBehaviour
 
         mapPos = PointCloudVisualize.instance.FindMapPos(position2D.x, position2D.y);
 
-        Vector3 gravity_force = new Vector3(0, -9.81f * m, 0);
+        Vector3 gravity_force = new Vector3(0, -9.81f * mass, 0);
 
         Vector3 newVelocity = velocity;
         Vector3 N = new Vector3();
-        Vector3 G = m * g;
+        Vector3 G = mass * gravity;
         Vector3 normalVelocity;
 
-        if (mapPos < 0)
+        if (mapPos <= 0 || mapPos >= PointCloudVisualize.instance.meshToSpawn.vertices.Length)
         {
-            print(PointCloudVisualize.instance.meshToSpawn.normals.Count() + "," + (mapPos));
+            if (cooldown)
+            {
+                print("1. Cooldown");
+            }
+            else
+            {
+                //print(PointCloudVisualize.instance.meshToSpawn.normals.Count() + "," + (mapPos));
 
-            //Destroy Droplet
+                RemoveDroplet();
+
+                print("mapPos <= -1");
+            }
         }
         else
         {
-            //print("1. Enter Else");
+            if (PointCloudVisualize.instance.meshToSpawn.normals[mapPos] == null)
+            {
+                print("PointCloudVisualize.instance.meshToSpawn.normals[mapPos] == null");
 
-            Vector3 normal = PointCloudVisualize.instance.meshToSpawn.normals[mapPos];
+                return;
+            }
 
-            var hit = PointCloudVisualize.instance.CheckCollission(transform.position, velocity, mapPos, r);
+            //Vector3 normal = PointCloudVisualize.instance.meshToSpawn.normals[mapPos];
+
+            var hit = PointCloudVisualize.instance.CheckCollission(transform.position, mapPos, radius);
 
             if (hit != Vector3.one * -1f)
             {
+                cooldown = true;
+
                 N = -Vector3.Dot(hit, gravity_force) * hit;
                 Vector3 Vnormal = Vector3.Dot(velocity, hit) * hit;
                 velocity = velocity - Vnormal;
             }
-
-            #region 
-            //var d = hit.position - transform.position;
-
-            //print("d: " + d);
-            //print("hit.position: " + hit.position);
-            //print("transform.position: " + transform.position);
-            //print("d.sqrMagnitude: " + d.sqrMagnitude + " | (r * r): " + (r * r));
-
-            //if (hit.isHit && d.sqrMagnitude <= (r * r))
-            //{
-            //    normalVelocity = Vector3.Dot(velocity, hit.normal) * hit.normal;
-
-            //    //Reflection
-            //    velocity = velocity - normalVelocity - bounciness * normalVelocity;
-
-            //    lastPosition = hit.position;
-
-            //    N = -Vector3.Dot(hit.normal, G) * hit.normal;
-
-            //    transform.position = hit.position + (r * hit.normal);
-
-            //    //print("Hit");
-            //}
-            //else
-            //{
-            //    lastPosition = transform.position;
-            //}
-            #endregion
         }
 
-        Vector3 acceleration = new Vector3();
-        acceleration = (G + N) / m;
+        acceleration = (G + N) / mass;
 
-        velocity += acceleration * Time.fixedDeltaTime;
+        velocity += acceleration * Time.fixedDeltaTime * RainManager.instance.dropletSpeed;
         transform.position += velocity * Time.fixedDeltaTime;
+    }
 
+    void UnderTheMesh()
+    {
+        if (transform.position.y <= RainManager.instance.maxHeightUnderMesh)
+        {
+            RemoveDroplet();
+
+            print("UnderTheMesh");
+        }
+    }
+
+    void RemoveDroplet()
+    {
+        cooldown = false;
+        gameObject.SetActive(false);
+    }
+    public void ResetLifetime()
+    {
+        cooldown = false;
+        cooldownTime = RainManager.instance.dropletLifetime;
+
+        gameObject.SetActive(true);
     }
 
     [ExecuteInEditMode]
@@ -127,6 +160,6 @@ public class Ball : MonoBehaviour
         lastPosition = transform.position;
 
         Gizmos.color = Color.white;
-        Gizmos.DrawWireSphere(lastPosition, r);
+        Gizmos.DrawWireSphere(lastPosition, radius);
     }
 }
