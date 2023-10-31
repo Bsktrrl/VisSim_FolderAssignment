@@ -99,4 +99,4 @@ MonoBehaviour:
   pointCloudVisualize: {fileID: 0}
   bounciness: 0
   cooldown: 0
-  cooldowntTime: 3
+  cooldownTime: 0

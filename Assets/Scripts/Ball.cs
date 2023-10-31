@@ -52,6 +52,15 @@ public class Ball : MonoBehaviour
         //    lastPosition = Vector3.zero;
         //}
 
+        //Check if gameObject is stuck
+        DropletIsStuck();
+
+        //Perform moving of the gameObject
+        Move();
+
+        //Check if gameObject is under the Mesh
+        UnderTheMesh();
+
         if (cooldown)
         {
             cooldownTime -= Time.deltaTime;
@@ -60,23 +69,20 @@ public class Ball : MonoBehaviour
             {
                 RemoveDroplet();
 
-                print("Time Up");
+                //print("Time Up");
             }
         }
     }
     private void FixedUpdate()
     {
-        //Perform moving of the gameObject
-        Move();
-
-        //Check if gameObject is under the Mesh
-        UnderTheMesh();
+        
     }
 
     void Move()
     {
         Vector3 position = transform.position;
         Vector2 position2D = new Vector2(position.x, position.z);
+        lastPosition = position;
 
         mapPos = PointCloudVisualize.instance.FindMapPos(position2D.x, position2D.y);
 
@@ -91,7 +97,7 @@ public class Ball : MonoBehaviour
         {
             if (cooldown)
             {
-                print("1. Cooldown");
+                //print("1. Cooldown");
             }
             else
             {
@@ -99,14 +105,14 @@ public class Ball : MonoBehaviour
 
                 RemoveDroplet();
 
-                print("mapPos <= -1");
+                //print("mapPos <= -1");
             }
         }
         else
         {
             if (PointCloudVisualize.instance.meshToSpawn.normals[mapPos] == null)
             {
-                print("PointCloudVisualize.instance.meshToSpawn.normals[mapPos] == null");
+                //print("PointCloudVisualize.instance.meshToSpawn.normals[mapPos] == null");
 
                 return;
             }
@@ -137,7 +143,16 @@ public class Ball : MonoBehaviour
         {
             RemoveDroplet();
 
-            print("UnderTheMesh");
+            //print("UnderTheMesh");
+        }
+    }
+    void DropletIsStuck()
+    {
+        if (transform.position == lastPosition)
+        {
+            print("DropletIsStuck");
+
+            RemoveDroplet();
         }
     }
 
