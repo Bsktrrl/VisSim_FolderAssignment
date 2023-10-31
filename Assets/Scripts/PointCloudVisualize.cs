@@ -410,10 +410,6 @@ public class PointCloudVisualize : MonoBehaviour
             }
         }
 
-        //print("minValue.x = " + minValue.x + " | minValue.y = " + minValue.y + " | minValue.z = " + minValue.z);
-        //print("maxValue.x = " + maxValue.x + " | maxValue.y = " + maxValue.y + " | maxValue.z = " + maxValue.z);
-        //print("Difference.x = " + (maxValue.x - minValue.x) + " | Difference.y = " + (maxValue.y - minValue.y) + " | Difference.z = " + (maxValue.z - minValue.z));
-
         //Change Point Position based on new Min/Max
         for (int i = 0; i < vertices_PointCloud.Count; i++)
         {

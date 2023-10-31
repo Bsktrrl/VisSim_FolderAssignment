@@ -11,6 +11,11 @@ public class RainManager : MonoBehaviour
     [SerializeField] GameObject DropletParent;
     [SerializeField] GameObject DropletPrefab;
 
+    [SerializeField] GameObject waterObject;
+    Vector3 startWaterPosition = new Vector3(800, -240, 600);
+    public float waterInDroplet = 0.01f;
+    public float waterLevel = 0;
+
     [SerializeField] List<GameObject> Droplets_Pool;
 
     Vector2 minSize = Vector2.zero;
@@ -23,6 +28,10 @@ public class RainManager : MonoBehaviour
     public float maxHeightUnderMesh = -100;
     [SerializeField] float spawnTime = 1;
     float timeToSpawn = 0;
+
+
+    //--------------------
+
 
     private void Awake()
     {
@@ -61,7 +70,13 @@ public class RainManager : MonoBehaviour
                 }
             }
         }
+
+        IncreaseWaterLevel();
     }
+
+
+    //--------------------
+
 
     void SpawnDroplet()
     {
@@ -76,7 +91,7 @@ public class RainManager : MonoBehaviour
                 amount++;
 
                 Droplets_Pool[i].transform.position = GetRandomSpawnPosition();
-                Droplets_Pool[i].GetComponent<Ball>().ResetLifetime();
+                Droplets_Pool[i].GetComponent<Ball>().ResetDropletLifetime();
                 
                 break;
             }
@@ -87,7 +102,7 @@ public class RainManager : MonoBehaviour
             Droplets_Pool.Add(Instantiate(DropletPrefab, GetRandomSpawnPosition(), Quaternion.identity) as GameObject);
             Droplets_Pool[Droplets_Pool.Count - 1].transform.parent = DropletParent.transform;
 
-            Droplets_Pool[Droplets_Pool.Count - 1].GetComponent<Ball>().ResetLifetime();
+            Droplets_Pool[Droplets_Pool.Count - 1].GetComponent<Ball>().ResetDropletLifetime();
         }
     }
 
@@ -107,5 +122,10 @@ public class RainManager : MonoBehaviour
         );
 
         return randomPosition;
+    }
+
+    void IncreaseWaterLevel()
+    {
+        waterObject.transform.position = new Vector3(startWaterPosition.x, startWaterPosition.y + waterLevel, startWaterPosition.z);
     }
 }

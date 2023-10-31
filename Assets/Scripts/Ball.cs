@@ -22,12 +22,13 @@ public class Ball : MonoBehaviour
     [SerializeField][Range(0, 1)] float bounciness = 0;
 
     Vector3 lastPosition = Vector3.zero;
-    //Vector3 startPosition;
 
     int mapPos = 0;
 
     [SerializeField] bool cooldown;
     [SerializeField] float cooldownTime;
+    float dropletStuck = 0.2f;
+    float dropletStuckTime = 0.2f;
 
 
     //--------------------
@@ -39,19 +40,13 @@ public class Ball : MonoBehaviour
     }
     private void Start()
     {
+        ResetDropletLifetime();
+
         //startPosition = transform.position;
         //cooldowntTime = timeAlive;
     }
     private void Update()
     {
-        //if (Input.GetKeyDown(KeyCode.Space))
-        //{
-        //    transform.position = startPosition;
-        //    velocity = Vector3.zero;
-        //    oldNormal = Vector3.zero;
-        //    lastPosition = Vector3.zero;
-        //}
-
         //Check if gameObject is stuck
         DropletIsStuck();
 
@@ -59,7 +54,7 @@ public class Ball : MonoBehaviour
         Move();
 
         //Check if gameObject is under the Mesh
-        UnderTheMesh();
+        DropletIsUnderTheMesh();
 
         if (cooldown)
         {
@@ -73,25 +68,17 @@ public class Ball : MonoBehaviour
             }
         }
     }
-    private void FixedUpdate()
-    {
-        
-    }
 
     void Move()
     {
         Vector3 position = transform.position;
         Vector2 position2D = new Vector2(position.x, position.z);
-        lastPosition = position;
 
         mapPos = PointCloudVisualize.instance.FindMapPos(position2D.x, position2D.y);
 
-        Vector3 gravity_force = new Vector3(0, -9.81f * mass, 0);
-
-        Vector3 newVelocity = velocity;
-        Vector3 N = new Vector3();
-        Vector3 G = mass * gravity;
-        Vector3 normalVelocity;
+        Vector3 Force_Vector = new Vector3(0, -9.81f * mass, 0);
+        Vector3 Normal_Vector = new Vector3();
+        Vector3 Gravity_Vector = mass * gravity;
 
         if (mapPos <= 0 || mapPos >= PointCloudVisualize.instance.meshToSpawn.vertices.Length)
         {
@@ -117,7 +104,7 @@ public class Ball : MonoBehaviour
                 return;
             }
 
-            //Vector3 normal = PointCloudVisualize.instance.meshToSpawn.normals[mapPos];
+            Vector3 normal = PointCloudVisualize.instance.meshToSpawn.normals[mapPos];
 
             var hit = PointCloudVisualize.instance.CheckCollission(transform.position, mapPos, radius);
 
@@ -125,19 +112,21 @@ public class Ball : MonoBehaviour
             {
                 cooldown = true;
 
-                N = -Vector3.Dot(hit, gravity_force) * hit;
-                Vector3 Vnormal = Vector3.Dot(velocity, hit) * hit;
-                velocity = velocity - Vnormal;
+                Normal_Vector = -Vector3.Dot(hit, Force_Vector) * hit;
+                Vector3 normalvelocity = Vector3.Dot(velocity, hit) * hit;
+                velocity = velocity - normalvelocity;
+
+                RainManager.instance.waterLevel += RainManager.instance.waterInDroplet;
             }
         }
 
-        acceleration = (G + N) / mass;
+        acceleration = (Gravity_Vector + Normal_Vector) / mass;
 
         velocity += acceleration * Time.fixedDeltaTime * RainManager.instance.dropletSpeed;
         transform.position += velocity * Time.fixedDeltaTime;
     }
 
-    void UnderTheMesh()
+    void DropletIsUnderTheMesh()
     {
         if (transform.position.y <= RainManager.instance.maxHeightUnderMesh)
         {
@@ -150,10 +139,12 @@ public class Ball : MonoBehaviour
     {
         if (transform.position == lastPosition)
         {
-            print("DropletIsStuck");
+            //print("3. DropletIsStuck");
 
             RemoveDroplet();
         }
+
+        lastPosition = transform.position;
     }
 
     void RemoveDroplet()
@@ -161,19 +152,23 @@ public class Ball : MonoBehaviour
         cooldown = false;
         gameObject.SetActive(false);
     }
-    public void ResetLifetime()
+    public void ResetDropletLifetime()
     {
         cooldown = false;
         cooldownTime = RainManager.instance.dropletLifetime;
 
+        dropletStuck = dropletStuckTime;
+
         gameObject.SetActive(true);
     }
+
+
+    //--------------------
+
 
     [ExecuteInEditMode]
     private void OnDrawGizmos()
     {
-        lastPosition = transform.position;
-
         Gizmos.color = Color.white;
         Gizmos.DrawWireSphere(lastPosition, radius);
     }
