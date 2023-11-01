@@ -1,61 +1,51 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using Unity.VisualScripting;
 using UnityEngine;
-
 
 public class Ball : MonoBehaviour
 {
-    [Header("File")]
-    //[SerializeField] TriangleSurface triangleSurface;
-    [SerializeField] PointCloudVisualize pointCloudVisualize;
-
+    #region Variables
+    //Physics
     Vector3 gravity = Physics.gravity;
-    float mass = 1f;
-    float radius = 5f;
     Vector3 velocity = Vector3.zero;
     Vector3 acceleration = new Vector3();
+    float mass = 1f;
+    float radius = 5f;
 
-    [Header("Stats")]
-    [SerializeField][Range(0, 1)] float bounciness = 0;
-
+    //Position
     Vector3 lastPosition = Vector3.zero;
+    int mapPoint = 0;
 
-    int mapPos = 0;
-
+    //Stats
+    [Header("Stats")]
     [SerializeField] bool cooldown;
     [SerializeField] float cooldownTime;
-    float dropletStuck = 0.2f;
-    float dropletStuckTime = 0.2f;
+
+    [HideInInspector] float dropletStuck = 0.2f;
+    [HideInInspector] float dropletStuckTime = 0.2f;
+    #endregion
 
 
     //--------------------
 
 
-    private void Awake()
-    {
-        pointCloudVisualize = FindObjectOfType<PointCloudVisualize>();
-    }
     private void Start()
     {
         ResetDropletLifetime();
-
-        //startPosition = transform.position;
-        //cooldowntTime = timeAlive;
     }
     private void Update()
     {
-        //Check if gameObject is stuck
+        //Check if gameObject is stuck, to despawn it
         DropletIsStuck();
 
-        //Perform moving of the gameObject
-        Move();
+        //Perform the movement of the gameObject
+        Movement();
 
-        //Check if gameObject is under the Mesh
+        //Check if gameObject is under the Mesh, to despawn it
         DropletIsUnderTheMesh();
 
+        //Check if gameObject have been on the mesh for its lifetime duration, to despawn it
         if (cooldown)
         {
             cooldownTime -= Time.deltaTime;
@@ -63,84 +53,98 @@ public class Ball : MonoBehaviour
             if (cooldownTime <= 0)
             {
                 RemoveDroplet();
-
-                //print("Time Up");
             }
         }
     }
 
-    void Move()
+
+    //--------------------
+
+
+    void Movement()
     {
+        //Get gameObject's 2D position
         Vector3 position = transform.position;
         Vector2 position2D = new Vector2(position.x, position.z);
 
-        mapPos = PointCloudVisualize.instance.FindMapPos(position2D.x, position2D.y);
+        //Find which point on the regular mesh the gameObject is on
+        mapPoint = PointCloudVisualize.instance.FindDropletPosition(position2D.x, position2D.y);
 
-        Vector3 Force_Vector = new Vector3(0, -9.81f * mass, 0);
-        Vector3 Normal_Vector = new Vector3();
-        Vector3 Gravity_Vector = mass * gravity;
+        //Set physics vectors
+        Vector3 force_Vector = new Vector3(0, -9.81f * mass, 0);
+        Vector3 normal_Vector = new Vector3();
+        Vector3 gravity_Vector = mass * gravity;
 
-        if (mapPos <= 0 || mapPos >= PointCloudVisualize.instance.meshToSpawn.vertices.Length)
+        //Check if mapPoint is outside "meshToSpawn.vertices"-bounds
+        if (mapPoint <= 0 || mapPoint >= PointCloudVisualize.instance.tempMesh.vertices.Length)
         {
-            if (cooldown)
+            //If outside, keep the droplet alive as long as it has collided with the mesh
+            if (!cooldown)
             {
-                //print("1. Cooldown");
-            }
-            else
-            {
-                //print(PointCloudVisualize.instance.meshToSpawn.normals.Count() + "," + (mapPos));
-
                 RemoveDroplet();
-
-                //print("mapPos <= -1");
             }
         }
+
+        //If mapPoint is iside "meshToSpawn.vertices"-bounds
         else
         {
-            if (PointCloudVisualize.instance.meshToSpawn.normals[mapPos] == null)
+            //Check if mapPoint contain a legal index
+            if (PointCloudVisualize.instance.tempMesh.normals[mapPoint] == null)
             {
-                //print("PointCloudVisualize.instance.meshToSpawn.normals[mapPos] == null");
-
                 return;
             }
 
-            Vector3 normal = PointCloudVisualize.instance.meshToSpawn.normals[mapPos];
+            //Get the point where collission takes place 
+            Vector3 collission = PointCloudVisualize.instance.GetCollissionPoint(transform.position, mapPoint, radius);
 
-            var hit = PointCloudVisualize.instance.CheckCollission(transform.position, mapPos, radius);
-
-            if (hit != Vector3.one * -1f)
+            //Check if gameObject collides with the mesh
+            if (collission != Vector3.one * -1f)
             {
+                //Start gameObject's cooldown process, before repawning it
                 cooldown = true;
 
-                Normal_Vector = -Vector3.Dot(hit, Force_Vector) * hit;
-                Vector3 normalvelocity = Vector3.Dot(velocity, hit) * hit;
-                velocity = velocity - normalvelocity;
+                //Use physics to setup the change of the gameObject's movement direction
+                normal_Vector = -Vector3.Dot(collission, force_Vector) * collission;
+                Vector3 normal_Velocity = Vector3.Dot(velocity, collission) * collission;
+                velocity = velocity - normal_Velocity;
 
+                //Increase water level with the gameObject's water amount
                 RainManager.instance.waterLevel += RainManager.instance.waterInDroplet;
             }
         }
 
-        acceleration = (Gravity_Vector + Normal_Vector) / mass;
-
-        velocity += acceleration * Time.fixedDeltaTime * RainManager.instance.dropletSpeed;
-        transform.position += velocity * Time.fixedDeltaTime;
+        //Change gameObject position based on acceleration and velocity
+        if (cooldown)
+        {
+            acceleration = (gravity_Vector + normal_Vector) / mass;
+            velocity += acceleration * Time.fixedDeltaTime / 100;
+            transform.position += velocity * Time.fixedDeltaTime;
+        }
+        else
+        {
+            acceleration = (gravity_Vector + normal_Vector) / mass;
+            velocity += acceleration * Time.fixedDeltaTime * RainManager.instance.dropletSpeed;
+            transform.position += velocity * Time.fixedDeltaTime;
+        }
     }
+
+
+    //--------------------
+
 
     void DropletIsUnderTheMesh()
     {
-        if (transform.position.y <= RainManager.instance.maxHeightUnderMesh)
+        //Check if gameObject is under the mesh, to despawn it
+        if (transform.position.y <= RainManager.instance.despawningHeightUnderMesh)
         {
             RemoveDroplet();
-
-            //print("UnderTheMesh");
         }
     }
     void DropletIsStuck()
     {
+        //Check if gameObject is stuck, to despawn it
         if (transform.position == lastPosition)
         {
-            //print("3. DropletIsStuck");
-
             RemoveDroplet();
         }
 
@@ -149,14 +153,15 @@ public class Ball : MonoBehaviour
 
     void RemoveDroplet()
     {
+        //Despawn the mesh, placing the gameObject back into the pool
         cooldown = false;
         gameObject.SetActive(false);
     }
     public void ResetDropletLifetime()
     {
+        //Respawn the gameObject from the pool
         cooldown = false;
         cooldownTime = RainManager.instance.dropletLifetime;
-
         dropletStuck = dropletStuckTime;
 
         gameObject.SetActive(true);
@@ -166,10 +171,10 @@ public class Ball : MonoBehaviour
     //--------------------
 
 
-    [ExecuteInEditMode]
     private void OnDrawGizmos()
     {
+        //Draw gizmo around gameObject to keep track
         Gizmos.color = Color.white;
-        Gizmos.DrawWireSphere(lastPosition, radius);
+        Gizmos.DrawWireSphere(transform.position, radius);
     }
 }
