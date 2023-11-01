@@ -31,7 +31,7 @@ public class PointCloudVisualize : MonoBehaviour
 
     [Space(10)]
 
-    [SerializeField] bool showGizmo;
+    public bool showGizmo;
     [SerializeField] float gizmoSize = 1;
     [SerializeField] Color gizmoColor = new Color(0, 0, 0, 1);
 
@@ -477,7 +477,7 @@ public class PointCloudVisualize : MonoBehaviour
 
         //Build the tempMesh, calculating and inserting the vertices and indices into it
         tempMesh.vertices = GetVertices(vertices_Temp, gridSize).ToArray();
-        tempMesh.triangles = GetTriangles(gridSize).ToArray();
+        tempMesh.triangles = GetIndices(gridSize).ToArray();
 
         //Recalculate the tempMesh's normals
         tempMesh.RecalculateNormals();
@@ -618,7 +618,7 @@ public class PointCloudVisualize : MonoBehaviour
     {
         return (pos - min) / (max - min) * (size - zero) + zero;
     }
-    List<int> GetTriangles(int size)
+    List<int> GetIndices(int size)
     {
         List<int> indexList = new List<int>();
 
@@ -782,7 +782,17 @@ public class PointCloudVisualize : MonoBehaviour
             Gizmos.color = gizmoColor;
 
             //Cube
-            Gizmos.DrawCube(new Vector3(vertices_PointCloud[i].x, vertices_PointCloud[i].y, vertices_PointCloud[i].z), new Vector3(gizmoSize, gizmoSize, gizmoSize));
+            Gizmos.DrawCube
+                (
+                    new Vector3
+                    (
+                        vertices_PointCloud[i].x, 
+                        vertices_PointCloud[i].y, 
+                        vertices_PointCloud[i].z
+                    ),
+
+                    new Vector3(gizmoSize, gizmoSize, gizmoSize)
+                );
         }
     }
 }

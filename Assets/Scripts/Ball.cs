@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
+using UnityEditor;
 using UnityEngine;
 
 public class Ball : MonoBehaviour
@@ -24,6 +26,10 @@ public class Ball : MonoBehaviour
 
     [HideInInspector] float dropletStuck = 0.2f;
     [HideInInspector] float dropletStuckTime = 0.2f;
+
+    public List<Vector3> posList = new List<Vector3>();
+    float posPointRegistrationTime = 0.1f;
+    float posTimer;
     #endregion
 
 
@@ -33,6 +39,8 @@ public class Ball : MonoBehaviour
     private void Start()
     {
         ResetDropletLifetime();
+
+        posTimer = posPointRegistrationTime;
     }
     private void Update()
     {
@@ -55,6 +63,9 @@ public class Ball : MonoBehaviour
                 RemoveDroplet();
             }
         }
+
+        //Display the position journey of the ball
+        DropletJourney();
     }
 
 
@@ -155,6 +166,7 @@ public class Ball : MonoBehaviour
     {
         //Despawn the mesh, placing the gameObject back into the pool
         cooldown = false;
+        posList.Clear();
         gameObject.SetActive(false);
     }
     public void ResetDropletLifetime()
@@ -164,7 +176,28 @@ public class Ball : MonoBehaviour
         cooldownTime = RainManager.instance.dropletLifetime;
         dropletStuck = dropletStuckTime;
 
+        posTimer = posPointRegistrationTime;
+
         gameObject.SetActive(true);
+    }
+
+
+    //--------------------
+
+
+    void DropletJourney()
+    {
+        if (cooldown)
+        {
+            posTimer -= Time.deltaTime;
+
+            if (posTimer <= 0)
+            {
+                posTimer = posPointRegistrationTime;
+
+                posList.Add(new Vector3(transform.position.x, transform.position.y + 10, transform.position.z));
+            }
+        }
     }
 
 
@@ -174,7 +207,20 @@ public class Ball : MonoBehaviour
     private void OnDrawGizmos()
     {
         //Draw gizmo around gameObject to keep track
-        Gizmos.color = Color.white;
-        Gizmos.DrawWireSphere(transform.position, radius);
+        //Gizmos.color = Color.black;
+        //Gizmos.DrawWireSphere(transform.position, radius);
+
+        if (PointCloudVisualize.instance.showGizmo)
+        {
+            for (int i = 1; i < posList.Count; i++)
+            {
+                //Gizmos.DrawLine(posList[i - 1], posList[i]);
+
+                var p1 = posList[i - 1];
+                var p2 = posList[i];
+                var thickness = 4;
+                Handles.DrawBezier(p1, p2, p1, p2, Color.black, null, thickness);
+            }
+        }
     }
 }
