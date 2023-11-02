@@ -206,16 +206,10 @@ public class Ball : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        //Draw gizmo around gameObject to keep track
-        //Gizmos.color = Color.black;
-        //Gizmos.DrawWireSphere(transform.position, radius);
-
         if (PointCloudVisualize.instance.showGizmo)
         {
             for (int i = 1; i < posList.Count; i++)
             {
-                //Gizmos.DrawLine(posList[i - 1], posList[i]);
-
                 var p1 = posList[i - 1];
                 var p2 = posList[i];
                 var thickness = 4;
