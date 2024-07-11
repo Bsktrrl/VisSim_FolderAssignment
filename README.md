@@ -12,8 +12,8 @@ The grid has been saved to file for easier access.
 <br>
 <br>
 In addition, I have simulated physiscs on the terrain using barysentric coordinates so that droplets could fall from the sky hitting the terrain, and increase the water level on it.<br>
-<img src="https://github.com/Bsktrrl/Bsktrrl.github.io/blob/main/images/PointCloud/PointCloud1.gif" width="70%"/><br>
-<img src="https://github.com/Bsktrrl/Bsktrrl.github.io/blob/main/images/PointCloud/PointCloud2.gif" width="70%"/><br>
+<img src="https://github.com/Bsktrrl/Bsktrrl.github.io/blob/main/images/PointCloud/PointCloud1.gif" width="50%"/>
+<img src="https://github.com/Bsktrrl/Bsktrrl.github.io/blob/main/images/PointCloud/PointCloud2.gif" width="50%"/><br>
 <br>
 <br>
 
