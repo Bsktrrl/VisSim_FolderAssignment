@@ -1,4 +1,4 @@
-<img src="https://github.com/Bsktrrl/Bsktrrl.github.io/blob/main/images/PointCloud/PointCloud3.gif" width="50%"/><br>
+<img src="https://github.com/Bsktrrl/Bsktrrl.github.io/blob/main/images/PointCloud/PointCloud_Header.jpg" width="50%"/><br>
 
 ## Project Description
 This was my Folder Exam in the course "Visualization and Simulation".
