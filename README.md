@@ -11,7 +11,9 @@ I have used regular triangulation to make a grid from the pointcloud, making it 
 The grid has been saved to file for easier access.
 <br>
 <br>
-In addition, I have simulate physics on the terrain using barycentric coordinates so that droplets can fall from the sky hitting the terrain, and increase the water level on it.<br>
+In addition, I have simulate physics on the terrain using barycentric coordinates so that droplets can fall from the sky hitting the terrain, and increase the water level on it.
+<br>
+<br>
 <img src="https://github.com/Bsktrrl/Bsktrrl.github.io/blob/main/images/PointCloud/PointCloud1.gif" width="50%"/>
 <img src="https://github.com/Bsktrrl/Bsktrrl.github.io/blob/main/images/PointCloud/PointCloud2.gif" width="50%"/><br>
 <br>
